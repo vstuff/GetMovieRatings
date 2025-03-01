@@ -1,9 +1,17 @@
 import streamlit as st
 import requests
 import pandas as pd
+from dotenv import load_dotenv
+import os
 
-# OMDb API key placeholder
-API_KEY = "92ff2a2e"  # Replace with your actual key from omdbapi.com
+# Load environment variables from .env file
+load_dotenv()
+
+# OMDb API key from environment
+API_KEY = os.getenv("OMDB_API_KEY")
+if not API_KEY:
+    st.error("OMDB_API_KEY not found in environment. Please set it in .env or Streamlit secrets.")
+    st.stop()
 
 # Language- and type-aware recommendation dictionary
 RECOMMENDATIONS = {
@@ -14,7 +22,7 @@ RECOMMENDATIONS = {
         },
         "Tamil": {
             "movie": ["Baasha", "Thuppakki", "Sivaji: The Boss"],
-            "series": ["Navarasa", "Asuravithu", "Aaranya Kaandam"]  # Limited series data, placeholders
+            "series": ["Navarasa", "Asuravithu", "Aaranya Kaandam"]
         }
     },
     "Sci-Fi": {
@@ -24,7 +32,7 @@ RECOMMENDATIONS = {
         },
         "Tamil": {
             "movie": ["Enthiran", "24", "2.0"],
-            "series": ["Time Enna Boss", "Triples", "Karthik Dial Seytha Yenn"]  # Sparse, placeholders
+            "series": ["Time Enna Boss", "Triples", "Karthik Dial Seytha Yenn"]
         }
     },
     "Drama": {
@@ -155,14 +163,13 @@ if submit_button and movie_title:
         else:
             st.write("No similar titles found.")
 
-        # Recommendations table with language and type precedence
+        # Recommendations table
         st.markdown("<h3 style='text-align: center; margin-top: 20px;'>Recommended For You</h3>", unsafe_allow_html=True)
         genre = data.get("Genre", "").split(", ")[0]
         searched_language = language_input if language_input else data.get("Language", "English").split(", ")[0]
-        searched_type = data.get("Type", "movie")  # Default to movie if not specified
+        searched_type = data.get("Type", "movie")
         recs = RECOMMENDATIONS.get(genre, {}).get(searched_language, {}).get(searched_type, [])
 
-        # If no type-specific recs, fallback to any in that language, then English
         if not recs:
             for t in ["movie", "series"]:
                 recs = RECOMMENDATIONS.get(genre, {}).get(searched_language, {}).get(t, [])
