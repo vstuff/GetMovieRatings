@@ -1,33 +1,30 @@
 import streamlit as st
 import requests
-import pandas as pd
 from dotenv import load_dotenv
 import os
 
 # Load environment variables from .env file
 load_dotenv()
-
-# OMDb API key from environment
 API_KEY = os.getenv("OMDB_API_KEY")
 if not API_KEY:
     st.error("OMDB_API_KEY not found in environment. Please set it in .env or Streamlit secrets.")
     st.stop()
 
-# Language- and type-aware recommendation dictionary
-RECOMMENDATIONS = {
+# Limited static dictionary as seeds (not exhaustive)
+SEED_TITLES = {
     "Action": {
         "English": {
-            "movie": ["The Dark Knight", "Mad Max: Fury Road", "Die Hard"],
+            "movie": ["The Dark Knight", "Mad Max: Fury Road", "John Wick"],
             "series": ["Breaking Bad", "24", "The Boys"]
         },
         "Tamil": {
             "movie": ["Baasha", "Thuppakki", "Sivaji: The Boss"],
-            "series": ["Navarasa", "Asuravithu", "Aaranya Kaandam"]
+            "series": ["Navarasa", "Auto Shankar", "Kallachirippu"]
         }
     },
     "Sci-Fi": {
         "English": {
-            "movie": ["Blade Runner", "Interstellar", "The Matrix"],
+            "movie": ["Interstellar", "The Matrix", "Blade Runner"],
             "series": ["Stranger Things", "Westworld", "Black Mirror"]
         },
         "Tamil": {
@@ -42,13 +39,13 @@ RECOMMENDATIONS = {
         },
         "Tamil": {
             "movie": ["Nayakan", "Anbe Sivam", "Pariyerum Perumal"],
-            "series": ["Queen", "Suzhal - The Vortex", "Mandala Murders"]
+            "series": ["Queen", "Suzhal - The Vortex", "Family Man"]
         }
     },
     "Comedy": {
         "English": {
             "movie": ["The Hangover", "Superbad", "Anchorman"],
-            "series": ["The Office", "Brooklyn Nine-Nine", "Parks and Recreation"]
+            "series": ["The Office", "Brooklyn Nine-Nine", "Friends"]
         },
         "Tamil": {
             "movie": ["Michael Madana Kama Rajan", "Panchatanthiram", "Sathi Leelavathi"],
@@ -57,23 +54,36 @@ RECOMMENDATIONS = {
     }
 }
 
-# Mobile-friendly CSS
+# Enhanced mobile-friendly CSS with colors and table styling
 st.markdown("""
     <style>
-    .stDataFrame { width: 100% !important; }
+    body { background-color: #f5f6f5; font-family: 'Arial', sans-serif; }
+    .custom-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .custom-table th, .custom-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .custom-table th { background-color: #ecf0f1; color: #2c3e50; }
+    .custom-table tr:nth-child(even) { background-color: #f9f9f9; }
+    h1 { color: #1E90FF; text-align: center; margin-bottom: 0; }
+    h3 { color: #2c3e50; text-align: center; margin-top: 20px; }
+    p { color: #7f8c8d; text-align: center; }
+    .stColumn { padding: 10px; }
+    .ratings-box { background-color: #ecf0f1; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .section-box { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-top: 20px; }
+    a { color: #1E90FF; text-decoration: none; }
+    a:hover { text-decoration: underline; }
     @media (max-width: 768px) {
         .stColumn { display: block; width: 100%; margin-bottom: 10px; }
         h3 { font-size: 1.2em; }
         h1 { font-size: 1.5em; }
         p { font-size: 0.9em; }
+        .custom-table th, .custom-table td { font-size: 0.9em; padding: 6px; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # App title and description
-st.markdown("<h1 style='text-align: center; color: #1E90FF;'>GetMovieRatings</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #666;'>Ratings, top matches, and recommendations.</p>", unsafe_allow_html=True)
-st.write("*Tip: Use exact titles (e.g., 'The Matrix' or 'Baasha')—language optional.*")
+st.markdown("<h1>GetMovieRatings</h1>", unsafe_allow_html=True)
+st.markdown("<p>Ratings, top matches, and personalized recommendations.</p>", unsafe_allow_html=True)
+st.write("*Tip: Use exact titles (e.g., 'The Matrix' or 'Baasha')—misspellings are forgiven!*")
 
 # Form for input
 with st.form(key="movie_form"):
@@ -86,7 +96,7 @@ with st.form(key="movie_form"):
 
 # Process submission
 if submit_button and movie_title:
-    # Exact match fetch
+    # Try exact match first
     url_params = f"t={movie_title.replace(' ', '+')}"
     if language_input:
         url_params += f"&language={language_input.lower()}"
@@ -94,117 +104,233 @@ if submit_button and movie_title:
     response = requests.get(url)
     data = response.json()
 
-    if data["Response"] == "True":
-        st.success(f"Found: {data['Title']}")
-
-        # Two-column layout for requested movie
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            poster_url = data.get("Poster", "")
-            if poster_url and poster_url != "N/A":
-                st.image(poster_url, caption=data['Title'], use_container_width=True)
-            else:
-                st.write("No poster available")
-
-        with col2:
-            st.markdown("### Ratings")
-            ratings = data.get("Ratings", [])
-            for rating in ratings:
-                source = rating["Source"]
-                value = rating["Value"]
-                if source == "Rotten Tomatoes":
-                    st.markdown(f"🍅 <b style='color: #FF4500;'>{source}: {value}</b>", unsafe_allow_html=True)
-                elif source == "Internet Movie Database":
-                    st.markdown(f"⭐ <b style='color: #FFD700;'>{source}: {value}</b>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"📊 <b>{source}: {value}</b>", unsafe_allow_html=True)
-            if not ratings:
-                st.write("No ratings available")
-
-            with st.expander("Details"):
-                for key, value in data.items():
-                    if key not in ["Response", "Ratings", "Poster"] and value and value != "N/A":
-                        st.write(f"**{key}**: {value}")
-
-        # Wildcard search for top 5 similar names
-        st.markdown("<h3 style='text-align: center; margin-top: 20px;'>Top Rated Movies with Similar Names</h3>", unsafe_allow_html=True)
+    # If exact match fails, fall back to wildcard search
+    if data["Response"] != "True":
         search_url = f"http://www.omdbapi.com/?s={movie_title.replace(' ', '+')}&apikey={API_KEY}"
         search_response = requests.get(search_url)
         search_data = search_response.json()
-
+        
         if search_data.get("Response") == "True" and "Search" in search_data:
-            search_results = search_data["Search"]
-            detailed_results = {}
-            for result in search_results[:10]:
+            best_match = None
+            max_votes = -1
+            for result in search_data["Search"][:5]:
+                detail_url = f"http://www.omdbapi.com/?i={result['imdbID']}&apikey={API_KEY}"
+                detail_response = requests.get(detail_url)
+                detail_data = detail_response.json()
+                if detail_data["Response"] == "True" and detail_data.get("imdbVotes", "0") != "N/A":
+                    votes = int(detail_data["imdbVotes"].replace(",", ""))
+                    if votes > max_votes:
+                        max_votes = votes
+                        best_match = detail_data
+            if best_match:
+                data = best_match
+                st.info(f"Did you mean '{data['Title']}'? Showing results for the closest match.")
+            else:
+                st.error("No close matches found. Try a different spelling.")
+                st.stop()
+        else:
+            st.error("Not found! Check the title and try again.")
+            st.stop()
+
+    # Proceed with matched data
+    imdb_id = data.get("imdbID", "")
+    imdb_link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
+    st.success("Found:")
+    st.markdown(f"<a href='{imdb_link}' target='_blank'>{data['Title']}</a>", unsafe_allow_html=True)
+
+    # Two-column layout for requested movie
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        poster_url = data.get("Poster", "")
+        if poster_url and poster_url != "N/A":
+            st.image(poster_url, caption=data['Title'], use_container_width=True)
+        else:
+            st.write("No poster available")
+
+    with col2:
+        st.markdown("<div class='ratings-box'>", unsafe_allow_html=True)
+        st.markdown("### Ratings")
+        ratings = data.get("Ratings", [])
+        for rating in ratings:
+            source = rating["Source"]
+            value = rating["Value"]
+            if source == "Rotten Tomatoes":
+                rt_link = f"https://www.rottentomatoes.com/search?search={data['Title'].replace(' ', '+')}"
+                st.markdown(f"🍅 <b style='color: #FF4500;'><a href='{rt_link}' target='_blank'>{source}: {value}</a></b>", unsafe_allow_html=True)
+            elif source == "Internet Movie Database":
+                st.markdown(f"⭐ <b style='color: #FFD700;'><a href='{imdb_link}' target='_blank'>{source}: {value}</a></b>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"📊 <b>{source}: {value}</b>", unsafe_allow_html=True)
+        if not ratings:
+            st.write("No ratings available")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        with st.expander("Details"):
+            for key, value in data.items():
+                if key not in ["Response", "Ratings", "Poster"] and value and value != "N/A":
+                    st.write(f"**{key}**: {value}")
+
+    # Wildcard search
+    st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+    st.markdown("<h3>Top Rated Movies with Similar Names</h3>", unsafe_allow_html=True)
+    search_url = f"http://www.omdbapi.com/?s={movie_title.replace(' ', '+')}&apikey={API_KEY}"
+    search_response = requests.get(search_url)
+    search_data = search_response.json()
+
+    if search_data.get("Response") == "True" and "Search" in search_data:
+        search_results = search_data["Search"]
+        detailed_results = {}
+        for result in search_results[:10]:
+            detail_url = f"http://www.omdbapi.com/?i={result['imdbID']}&apikey={API_KEY}"
+            detail_response = requests.get(detail_url)
+            detail_data = detail_response.json()
+            if detail_data["Response"] == "True" and detail_data.get("imdbVotes", "0") != "N/A":
+                title = detail_data["Title"]
+                if title not in detailed_results:
+                    votes = int(detail_data["imdbVotes"].replace(",", ""))
+                    imdb_id = detail_data.get("imdbID", "")
+                    link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
+                    detailed_results[title] = {
+                        "Movie Name": f"<a href='{link}' target='_blank'>{title}</a>",
+                        "Year": detail_data.get("Year", "N/A"),
+                        "Type": "🎬" if detail_data["Type"] == "movie" else "📺" if detail_data["Type"] == "series" else "❓",
+                        "Genre": detail_data.get("Genre", "N/A"),
+                        "Language": detail_data.get("Language", "N/A"),
+                        "Rotten Tomatoes": next((r["Value"] for r in detail_data.get("Ratings", []) if r["Source"] == "Rotten Tomatoes"), "N/A"),
+                        "IMDb": detail_data.get("imdbRating", "N/A"),
+                        "Votes": votes
+                    }
+
+        top_5 = sorted(detailed_results.values(), key=lambda x: x["Votes"], reverse=True)[:5]
+        if top_5:
+            table_html = "<table class='custom-table'><tr><th>Movie Name</th><th>Year</th><th>Type</th><th>Genre</th><th>Language</th><th>Rotten Tomatoes</th><th>IMDb</th></tr>"
+            for row in top_5:
+                table_html += f"<tr><td>{row['Movie Name']}</td><td>{row['Year']}</td><td>{row['Type']}</td><td>{row['Genre']}</td><td>{row['Language']}</td><td>{row['Rotten Tomatoes']}</td><td>{row['IMDb']}</td></tr>"
+            table_html += "</table>"
+            st.markdown(table_html, unsafe_allow_html=True)
+        else:
+            st.write("No similar titles found.")
+    else:
+        st.write("No similar titles found.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Hybrid recommendations: Seed dict + dynamic expansion
+    st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+    st.markdown("<h3>Recommended For You</h3>", unsafe_allow_html=True)
+    genre = data.get("Genre", "").split(", ")[0]
+    searched_language = language_input if language_input else data.get("Language", "English").split(", ")[0]
+    searched_type = data.get("Type", "movie")
+
+    # Stage 1: Start with seed titles
+    table_data = {}
+    seeds = SEED_TITLES.get(genre, {}).get(searched_language, {}).get(searched_type, [])
+    for seed in seeds:
+        if len(table_data) >= 5:
+            break
+        rec_url = f"http://www.omdbapi.com/?t={seed.replace(' ', '+')}&apikey={API_KEY}"
+        rec_response = requests.get(rec_url)
+        rec_data = rec_response.json()
+        if rec_data["Response"] == "True":
+            title = rec_data["Title"]
+            if title != data["Title"] and title not in table_data:
+                votes = int(rec_data.get("imdbVotes", "0").replace(",", ""))
+                imdb_id = rec_data.get("imdbID", "")
+                link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
+                rec_ratings = rec_data.get("Ratings", [])
+                table_data[title] = {
+                    "Movie Name": f"<a href='{link}' target='_blank'>{title}</a>",
+                    "Year": rec_data.get("Year", "N/A"),
+                    "Type": "🎬" if rec_data["Type"] == "movie" else "📺" if rec_data["Type"] == "series" else "❓",
+                    "Genre": rec_data.get("Genre", "N/A"),
+                    "Language": rec_data.get("Language", "N/A"),
+                    "Rotten Tomatoes": next((r["Value"] for r in rec_ratings if r["Source"] == "Rotten Tomatoes"), "N/A"),
+                    "IMDb": rec_data.get("imdbRating", "N/A"),
+                    "Votes": votes
+                }
+
+    # Stage 2: Expand dynamically using a seed title
+    if len(table_data) < 5 and seeds:
+        seed_title = seeds[0]  # Use first seed as pivot
+        rec_url = f"http://www.omdbapi.com/?s={seed_title.replace(' ', '+')}&type={searched_type}&apikey={API_KEY}"
+        rec_response = requests.get(rec_url)
+        rec_data = rec_response.json()
+        if rec_data.get("Response") == "True" and "Search" in rec_data:
+            for result in rec_data["Search"][:20]:
                 detail_url = f"http://www.omdbapi.com/?i={result['imdbID']}&apikey={API_KEY}"
                 detail_response = requests.get(detail_url)
                 detail_data = detail_response.json()
                 if detail_data["Response"] == "True" and detail_data.get("imdbVotes", "0") != "N/A":
                     title = detail_data["Title"]
-                    if title not in detailed_results:
-                        votes = int(detail_data["imdbVotes"].replace(",", ""))
-                        detailed_results[title] = {
-                            "Movie Name": title,
-                            "Year": detail_data.get("Year", "N/A"),
-                            "Type": "🎬" if detail_data["Type"] == "movie" else "📺" if detail_data["Type"] == "series" else "❓",
-                            "Genre": detail_data.get("Genre", "N/A"),
-                            "Language": detail_data.get("Language", "N/A"),
-                            "Rotten Tomatoes": next((r["Value"] for r in detail_data.get("Ratings", []) if r["Source"] == "Rotten Tomatoes"), "N/A"),
-                            "IMDb": detail_data.get("imdbRating", "N/A"),
-                            "Votes": votes
-                        }
+                    if title != data["Title"] and title not in table_data:
+                        lang_match = searched_language.lower() == detail_data.get("Language", "").lower().split(", ")[0]
+                        type_match = detail_data["Type"] == searched_type
+                        genre_match = genre.lower() in detail_data.get("Genre", "").lower()
+                        if lang_match and type_match and genre_match:
+                            votes = int(detail_data["imdbVotes"].replace(",", ""))
+                            imdb_id = detail_data.get("imdbID", "")
+                            link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
+                            rec_ratings = detail_data.get("Ratings", [])
+                            table_data[title] = {
+                                "Movie Name": f"<a href='{link}' target='_blank'>{title}</a>",
+                                "Year": detail_data.get("Year", "N/A"),
+                                "Type": "🎬" if detail_data["Type"] == "movie" else "📺" if detail_data["Type"] == "series" else "❓",
+                                "Genre": detail_data.get("Genre", "N/A"),
+                                "Language": detail_data.get("Language", "N/A"),
+                                "Rotten Tomatoes": next((r["Value"] for r in rec_ratings if r["Source"] == "Rotten Tomatoes"), "N/A"),
+                                "IMDb": detail_data.get("imdbRating", "N/A"),
+                                "Votes": votes
+                            }
+                        if len(table_data) >= 5:
+                            break
 
-            top_5 = sorted(detailed_results.values(), key=lambda x: x["Votes"], reverse=True)[:5]
-            if top_5:
-                df_top = pd.DataFrame(top_5).drop(columns=["Votes"])
-                st.dataframe(df_top, use_container_width=True)
-            else:
-                st.write("No similar titles found.")
-        else:
-            st.write("No similar titles found.")
+    # Pass 3: Same language, any type, same genre (if needed)
+    if len(table_data) < 5:
+        alt_type = "series" if searched_type == "movie" else "movie"
+        if seeds:
+            seed_title = seeds[0]
+            rec_url = f"http://www.omdbapi.com/?s={seed_title.replace(' ', '+')}&type={alt_type}&apikey={API_KEY}"
+            rec_response = requests.get(rec_url)
+            rec_data = rec_response.json()
+            if rec_data.get("Response") == "True" and "Search" in rec_data:
+                for result in rec_data["Search"][:20]:
+                    detail_url = f"http://www.omdbapi.com/?i={result['imdbID']}&apikey={API_KEY}"
+                    detail_response = requests.get(detail_url)
+                    detail_data = detail_response.json()
+                    if detail_data["Response"] == "True" and detail_data.get("imdbVotes", "0") != "N/A":
+                        title = detail_data["Title"]
+                        if title != data["Title"] and title not in table_data:
+                            lang_match = searched_language.lower() == detail_data.get("Language", "").lower().split(", ")[0]
+                            genre_match = genre.lower() in detail_data.get("Genre", "").lower()
+                            if lang_match and genre_match:
+                                votes = int(detail_data["imdbVotes"].replace(",", ""))
+                                imdb_id = detail_data.get("imdbID", "")
+                                link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "#"
+                                rec_ratings = detail_data.get("Ratings", [])
+                                table_data[title] = {
+                                    "Movie Name": f"<a href='{link}' target='_blank'>{title}</a>",
+                                    "Year": detail_data.get("Year", "N/A"),
+                                    "Type": "🎬" if detail_data["Type"] == "movie" else "📺" if detail_data["Type"] == "series" else "❓",
+                                    "Genre": detail_data.get("Genre", "N/A"),
+                                    "Language": detail_data.get("Language", "N/A"),
+                                    "Rotten Tomatoes": next((r["Value"] for r in rec_ratings if r["Source"] == "Rotten Tomatoes"), "N/A"),
+                                    "IMDb": detail_data.get("imdbRating", "N/A"),
+                                    "Votes": votes
+                                }
+                            if len(table_data) >= 5:
+                                break
 
-        # Recommendations table
-        st.markdown("<h3 style='text-align: center; margin-top: 20px;'>Recommended For You</h3>", unsafe_allow_html=True)
-        genre = data.get("Genre", "").split(", ")[0]
-        searched_language = language_input if language_input else data.get("Language", "English").split(", ")[0]
-        searched_type = data.get("Type", "movie")
-        recs = RECOMMENDATIONS.get(genre, {}).get(searched_language, {}).get(searched_type, [])
-
-        if not recs:
-            for t in ["movie", "series"]:
-                recs = RECOMMENDATIONS.get(genre, {}).get(searched_language, {}).get(t, [])
-                if recs:
-                    break
-        if not recs:
-            recs = RECOMMENDATIONS.get(genre, {}).get("English", {}).get(searched_type, [])[:5]
-
-        table_data = {}
-        for rec_title in recs[:5]:
-            if rec_title != data["Title"]:
-                rec_url = f"http://www.omdbapi.com/?t={rec_title.replace(' ', '+')}&apikey={API_KEY}"
-                rec_response = requests.get(rec_url)
-                rec_data = rec_response.json()
-                if rec_data["Response"] == "True":
-                    title = rec_data["Title"]
-                    if title not in table_data:
-                        rec_ratings = rec_data.get("Ratings", [])
-                        table_data[title] = {
-                            "Movie Name": title,
-                            "Year": rec_data.get("Year", "N/A"),
-                            "Type": "🎬" if rec_data["Type"] == "movie" else "📺" if rec_data["Type"] == "series" else "❓",
-                            "Genre": rec_data.get("Genre", "N/A"),
-                            "Language": rec_data.get("Language", "N/A"),
-                            "Rotten Tomatoes": next((r["Value"] for r in rec_ratings if r["Source"] == "Rotten Tomatoes"), "N/A"),
-                            "IMDb": next((r["Value"] for r in rec_ratings if r["Source"] == "Internet Movie Database"), "N/A")
-                        }
-
-        if table_data:
-            df_recs = pd.DataFrame(list(table_data.values()))
-            st.dataframe(df_recs, use_container_width=True)
-        else:
-            st.write("No recommendations available for this genre/language/type.")
-
+    # Sort and limit to 5
+    if table_data:
+        top_recs = sorted(table_data.values(), key=lambda x: x["Votes"], reverse=True)[:5]
+        table_html = "<table class='custom-table'><tr><th>Movie Name</th><th>Year</th><th>Type</th><th>Genre</th><th>Language</th><th>Rotten Tomatoes</th><th>IMDb</th></tr>"
+        for row in top_recs:
+            table_html += f"<tr><td>{row['Movie Name']}</td><td>{row['Year']}</td><td>{row['Type']}</td><td>{row['Genre']}</td><td>{row['Language']}</td><td>{row['Rotten Tomatoes']}</td><td>{row['IMDb']}</td></tr>"
+        table_html += "</table>"
+        st.markdown(table_html, unsafe_allow_html=True)
     else:
-        st.error("Not found! Check the title and try again.")
-elif submit_button and not movie_title:
-    st.warning("Please enter a movie or show name.")
+        st.write(f"No recommendations found in {searched_language} for {genre} {searched_type}s—OMDb may lack matching titles.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+else:
+    if submit_button and not movie_title:
+        st.warning("Please enter a movie or show name.")
