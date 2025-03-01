@@ -2,37 +2,36 @@ import streamlit as st
 import requests
 
 # Replace with your OMDb API key
-API_KEY = "92ff2a2e"  # Should already be set from earlier
+API_KEY = "92ff2a2e"  # e.g., "1234abcd" from omdbapi.com
 
-# App title
-st.title("Movie Ratings Finder")
+# App title and description
+st.title("Movie & Show Ratings Finder")
+st.write("Enter a movie or show name for which you want to find the rating")
 
-# Capture image from camera
-img_file = st.camera_input("Take a picture of a movie scene")
+# Text input for movie/show name
+movie_title = st.text_input("Movie or Show Name", placeholder="e.g., The Matrix")
 
-if img_file is not None:
-    # Show the captured image
-    st.image(img_file, caption="Captured Image")
-
-    # Let user enter the movie title
-    movie_title = st.text_input("Enter the movie title you think this is:")
-
-    # Only fetch data if a title is entered
+# Submit button
+if st.button("Get Rating"):
     if movie_title:
-        # Fetch movie data from OMDb API
-        url = f"http://www.omdbapi.com/?t={movie_title}&apikey={API_KEY}"
+        # Fetch data from OMDb API
+        url = f"http://www.omdbapi.com/?t={movie_title.replace(' ', '+')}&apikey={API_KEY}"
         response = requests.get(url)
         data = response.json()
 
-        # Display movie details if found
+        # Check if data was found
         if data["Response"] == "True":
-            st.subheader(data["Title"])
-            st.write(f"Year: {data['Year']}")
-            st.write(f"Genre: {data['Genre']}")
-            st.write(f"Plot: {data['Plot']}")
-            st.write(f"IMDb Rating: {data['imdbRating']}")
-            ratings = {r["Source"]: r["Value"] for r in data.get("Ratings", [])}
-            if "Rotten Tomatoes" in ratings:
-                st.write(f"Rotten Tomatoes: {ratings['Rotten Tomatoes']}")
+            st.success(f"Found: {data['Title']}")
+            # Display all fields dynamically
+            for key, value in data.items():
+                if key != "Response" and value and value != "N/A":  # Skip empty or irrelevant fields
+                    st.write(f"**{key}**: {value}")
         else:
-            st.error("Movie not found! Check the title and try again.")
+            st.error("Not found! Check the title and try again.")
+    else:
+        st.warning("Please enter a movie or show name.")
+
+# Commented out camera code for future use
+# img_file = st.camera_input("Take a picture of a movie scene")
+# if img_file is not None:
+#     st.image(img_file, caption="Captured Image")
